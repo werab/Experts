@@ -21,7 +21,7 @@ input int SlowMaShift = 0;
 input int SlowMaMethod = 0;
 input int SlowMaAppliedTo = 0;
 
-input int TPBuffer = 20;
+input int TPBuffer = 10;
 input int MinSLAdjust = 10;
 
 input double LotSize = 0.1;
@@ -53,6 +53,8 @@ int OnInit()
    lot = CorrectLots(LotSize);
       
    if(Digits==3 || Digits==5) pt=10*Point;   else   pt=Point;
+   Print("Point: "+(string) Point);
+   Print("pt: "+(string) pt);
 //---
    return(INIT_SUCCEEDED);
   }
@@ -83,18 +85,19 @@ void ModifyOrders(){
             bool success = false;
             if (OrderStopLoss() < Bid - (TPBuffer*pt))
             {
-               success = OrderModify(OrderTicket(), OrderOpenPrice(), Bid - (NormalizeDouble(TPBuffer/2, 0)*pt), OrderTakeProfit(), 0, clrMintCream);
+               double _sl = Bid - (NormalizeDouble(TPBuffer/2, 0)*pt);
+               success = OrderModify(OrderTicket(), OrderOpenPrice(), _sl, OrderTakeProfit(), 0, clrMintCream);
                if (!success){
                   int lErr = GetLastError();
                   Print("OrderModify LastError: "+(string)lErr);
                   ResetLastError();
                } else {
-                  Print("Orders Open: "+ (string)OrdersTotal() + " Orders Saved:"+ (string)(OrdersSaved+1));
+                  Print("Bid: "+(string)Bid+" - TPBuffer/2 * pt: "+ (string)(NormalizeDouble(TPBuffer/2, 0)*pt) + " = _sl:  "+ (string)_sl +" Orders Open: "+ (string)OrdersTotal() + " Orders Saved:"+ (string)(OrdersSaved+1));
                }
             }
             if (success) OrdersSaved++;
          } else {
- //           Print("OrderNr.: "+(string)o+" Diff:"+ (string)(NormalizeDouble(OrderOpenPrice() - (Bid - (TPBuffer*pt)),Digits)));
+//            Print("OrderNr.: "+(string)o+" Diff:"+ (string)(NormalizeDouble(OrderOpenPrice() - (Bid - (TPBuffer*pt)),Digits)));
          }
       } else if (OrderType() == OP_SELL){
          if (OrderOpenPrice() > Ask + TPBuffer){
@@ -112,7 +115,7 @@ void ModifyOrders(){
             }
             if (success) OrdersSaved++;
          } else {
- //           Print("OrderNr.: "+(string)o+" Diff:"+ (string)(NormalizeDouble((Ask + (TPBuffer*pt) - OrderOpenPrice()),Digits)));
+//            Print("OrderNr.: "+(string)o+" Diff:"+ (string)(NormalizeDouble((Ask + (TPBuffer*pt) - OrderOpenPrice()),Digits)));
             
          }
       }
@@ -136,7 +139,8 @@ int IndicateTrade()
 }
   
 int OrderEntry(int trade){
-   if (trade == BUY){
+//   if (trade == BUY){
+   if (trade == BUY && OrdersTotal() == 0){
       int ticket = OrderSend(Symbol(), OP_BUY, LotSize, Ask, 3, 0, 0, NULL, MAGICMA, 0, clrGreen);
       int lErr = GetLastError();
       Print("OrderBUY ticket: "+(string)ticket+ " LastError: "+(string)lErr);
@@ -145,13 +149,17 @@ int OrderEntry(int trade){
       if (ticket>0) {
          Print("StopLoss: "+ (string)StopLoss + " pt: " + (string) pt );
          Print("Modify StopLoss to:" + (string)(Ask-(StopLoss*pt)) + " Ask: "+(string)Ask + " StopLoss*pt: "+(string)(StopLoss*pt));
-         lErr = OrderModify(ticket, OrderOpenPrice(), Ask-(StopLoss*pt), 0, 0, clrYellow);
-         Print("OrderModify LastError: "+(string)lErr);
-         ResetLastError();
+         bool success = OrderModify(ticket, OrderOpenPrice(), Ask-(StopLoss*pt), 0, 0, clrYellow);
+         if (!success){
+            lErr = GetLastError();
+            Print("OrderModify LastError: "+(string)lErr);
+            ResetLastError();
+         }
       }
    }
    
-   if (trade == SELL) {
+//   if (trade == SELL) {
+   if (trade == SELL && OrdersTotal() == 0) {
       int ticket = OrderSend(Symbol(), OP_SELL, LotSize, Bid, 3, 0, 0, NULL, MAGICMA, 0, clrBlue);
       int lErr = GetLastError();
       Print("OrderSELL ticket: "+(string)ticket+ " LastError: "+(string)lErr);
@@ -160,9 +168,12 @@ int OrderEntry(int trade){
       if (ticket>0) {
       Print("StopLoss: "+ (string)StopLoss + " pt: " + (string) pt );
          Print("Modify StopLoss to:" + (string)(Bid+(StopLoss*pt)) + " Ask: "+(string)Ask + " StopLoss*pt: "+(string)(StopLoss*pt));
-         lErr = OrderModify(ticket, OrderOpenPrice(), Bid+(StopLoss*pt), 0, 0, clrYellow);
-         Print("OrderModify LastError: "+(string)lErr);
-         ResetLastError();    
+         bool success = OrderModify(ticket, OrderOpenPrice(), Bid+(StopLoss*pt), 0, 0, clrYellow);
+         if (!success){
+            lErr = GetLastError();
+            Print("OrderModify LastError: "+(string)lErr);
+            ResetLastError();
+         }
       }
    }
    
@@ -184,7 +195,8 @@ void OnTick()
 //---
    if (IsNewCandle()){
       int ret = OrderEntry(IndicateTrade());
-      ModifyOrders();  
+      ModifyOrders();
+      // todo: Print Bid - (TPBuffer*pt) as line
    }
 
   }
