@@ -24,13 +24,14 @@ input int SlowMaAppliedTo = 0;
 input int MaxBuyOrders = 1;
 input int MaxSellOrders = 1;
 input int MinCandlesBeforeTradeSignal = 25; // candles
-input int SLPuffer = 20;
+input int PadBuffer = 20;
 
 input double LotSize = 0.1;
 
 double pt;
 double lot;
 double TPBuffer;
+double StopLevel;
 int CurrentCandlesSinceLastMaSwap = 0;
 int TakeProfit = StopLoss * 3;
 
@@ -71,7 +72,7 @@ int OnInit()
    Print("Point: "+(string) Point);
    Print("pt: "+(string) pt);
    
-   TPBuffer = MarketInfo(Symbol(), MODE_STOPLEVEL) + SLPuffer;
+   StopLevel = MarketInfo(Symbol(), MODE_STOPLEVEL);
    
 //---
    return(INIT_SUCCEEDED);
