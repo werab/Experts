@@ -10,30 +10,32 @@
 
 #define MAGICMA  3443
 
-input int StopLoss = 100;
+input int StopLoss = 10;
 
 input int FastMa = 5;
-input int FastMaShift = 0;
-input int FastMaMethod = 0;
-input int FastMaAppliedTo = 0;
+int FastMaShift = 0;
+int FastMaMethod = 0;
+int FastMaAppliedTo = 0;
 input int SlowMa = 21;
-input int SlowMaShift = 0;
-input int SlowMaMethod = 0;
-input int SlowMaAppliedTo = 0;
+int SlowMaShift = 0;
+int SlowMaMethod = 0;
+int SlowMaAppliedTo = 0;
 
 input int MaxBuyOrders = 1;
 input int MaxSellOrders = 1;
 input int MinCandlesBeforeTradeSignal = 25; // candles
-input int PadBuffer = 20;
+
+input int AmountToLockIn = 10;
+input int PadBuffer = 10;
 
 input double LotSize = 0.1;
 
 double pt;
-double lot;
-double TPBuffer;
 double StopLevel;
 int CurrentCandlesSinceLastMaSwap = 0;
 int TakeProfit = StopLoss * 3;
+
+double Shift;
 
 bool allowBUYTrade = true;
 bool allowSELLTrade = true;
@@ -46,9 +48,17 @@ static int BUY = 1;
 
 ////////////////////////////////
 // Todo List:
-// Buy earliest after signal
+// Take Profit rein
+// SL auf Break Even setzen (BreakEvenBuffer)
+// Current Cash im Auge behalten
 
+// Use Custom Indicator
+//   * Main --> Buy/Sell Signal
+//   * Signal --> SL PadAmount
+// write indicator tester
+//   * count positiv/negativ trades with set SL to BreakEven
 
+/*
 double CorrectLots(double thelot) {
    double maxlots=MarketInfo(Symbol(),MODE_MAXLOT);
    double minlot=MarketInfo(Symbol(),MODE_MINLOT);
@@ -57,6 +67,7 @@ double CorrectLots(double thelot) {
    lots=MathMax(MathMin(maxlots,lots),minlot);
    return (lots);
   }
+*/
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -64,15 +75,13 @@ double CorrectLots(double thelot) {
 int OnInit()
   {
 //---
-
-
-   lot = CorrectLots(LotSize);
       
    if(Digits==3 || Digits==5) pt=10*Point;   else   pt=Point;
    Print("Point: "+(string) Point);
    Print("pt: "+(string) pt);
    
    StopLevel = MarketInfo(Symbol(), MODE_STOPLEVEL);
+   Shift = (AmountToLockIn + PadBuffer)*pt;
    
 //---
    return(INIT_SUCCEEDED);
@@ -105,11 +114,11 @@ void ModifyOrders(){
       if (OrderMagicNumber() == MAGICMA)
       if (OrderSymbol() == Symbol())
       if (OrderType() == OP_BUY){
-         if (OrderOpenPrice() < Bid - (TPBuffer*Point)){
+         if (OrderOpenPrice() < Bid - Shift){
             bool success = false;
-            if (OrderStopLoss() < Bid - (TPBuffer*Point))
+            if (OrderStopLoss() < Bid - Shift)
             {
-               double _sl = ND(Bid - (TPBuffer*Point));
+               double _sl = ND(Bid - (AmountToLockIn*pt));
                Print("Try to change SL to: "+ (string)_sl + " Bid: "+ (string)Bid);
                success = OrderModify(OrderTicket(), OrderOpenPrice(), _sl, OrderTakeProfit(), 0, clrMintCream);
                if (!success){
@@ -117,7 +126,7 @@ void ModifyOrders(){
                   Print("OrderModify LastError: "+(string)lErr);
                   ResetLastError();
                } else {
-                  Print("Bid: "+(string)Bid+" - TPBuffer*Point: "+ (string)(TPBuffer*Point) + " = _sl:  "+ (string)_sl +" Orders Open: "+ (string)OrdersTotal() + " Orders Saved:"+ (string)(OrdersSaved+1));
+                  Print("Bid: "+(string)Bid+" - Shift: "+ (string)Shift + " = _sl:  "+ (string)_sl +" Orders Open: "+ (string)OrdersTotal() + " Orders Saved:"+ (string)(OrdersSaved+1));
                }
             }
             if (success) OrdersSaved++;
@@ -125,11 +134,11 @@ void ModifyOrders(){
 //            Print("OrderNr.: "+(string)o+" Diff:"+ (string)(NormalizeDouble(OrderOpenPrice() - (Bid - (TPBuffer*pt)),Digits)));
          }
       } else if (OrderType() == OP_SELL){
-         if (OrderOpenPrice() > Ask + (TPBuffer*Point)){
+         if (OrderOpenPrice() > Ask + Shift){
             bool success = false;
-            if (OrderStopLoss() > Ask + (TPBuffer*Point))
+            if (OrderStopLoss() > Ask + Shift)
             {
-               double _sl = ND(Ask + (TPBuffer*Point));
+               double _sl = ND(Ask + (AmountToLockIn*pt));
                Print("Try to change SL to: "+ (string)_sl + " Ask: "+(string)Ask);
                success = OrderModify(OrderTicket(), OrderOpenPrice(), _sl, OrderTakeProfit(), 0, clrMintCream);
                if (!success){
@@ -137,7 +146,7 @@ void ModifyOrders(){
                   Print("OrderModify LastError: "+(string)lErr);
                   ResetLastError();
                } else {
-                  Print("Ask: "+(string)Ask+" + TPBuffer/2 * pt: "+ (string)(TPBuffer*Point) + " = _sl:  "+ (string)_sl +" Orders Open: "+ (string)OrdersTotal() + " Orders Saved:"+ (string)(OrdersSaved+1));
+                  Print("Ask: "+(string)Ask+" + Shift: "+ (string)Shift + " = _sl:  "+ (string)_sl +" Orders Open: "+ (string)OrdersTotal() + " Orders Saved:"+ (string)(OrdersSaved+1));
                }
             }
             if (success) OrdersSaved++;
@@ -219,8 +228,9 @@ int OrderEntry(int trade){
       ResetLastError();
       
       if (ticket>0) {
-         double _sl = ND(Ask-(StopLoss*Point));
-         double _tp = ND(Ask+(TakeProfit*Point));
+         double _sl = ND(Ask-(StopLoss*pt));
+//         double _tp = ND(Ask+(TakeProfit*pt));
+         double _tp = 0;
          Print("Try to modify BUY StopLoss to:" + (string)_sl + " modify TakeProfit to: "+ (string)_tp);
          bool success = OrderModify(ticket, OrderOpenPrice(), _sl, _tp, 0, clrYellow);
          if (!success){
@@ -239,8 +249,9 @@ int OrderEntry(int trade){
       ResetLastError();
       
       if (ticket>0) {
-         double _sl = ND(Bid+(StopLoss*Point));
-         double _tp = ND(Bid-(TakeProfit*Point));
+         double _sl = ND(Bid+(StopLoss*pt));
+//         double _tp = ND(Bid-(TakeProfit*pt));
+         double _tp = 0;
          Print("Try to modify SELL StopLoss to:" + (string)_sl + " modify TakeProfit to: "+ (string)_tp);
          bool success = OrderModify(ticket, OrderOpenPrice(), _sl, _tp, 0, clrYellow);
          if (!success){
@@ -258,7 +269,7 @@ int OrderEntry(int trade){
 //+------------------------------------------------------------------+
 void OnTick()
   {
-   Comment("LotSize is: " + (string) lot + "\n"+
+   Comment("LotSize is: " + (string) LotSize + "\n"+
            "Orders Open: "+ (string) OrdersTotal() + " / Orders Max: " + (string)(MaxBuyOrders + MaxSellOrders) +"\n"+
            "Orders Saved: "+ (string) OrdersSaved + "\n"+
            "Orders History: "+ (string) OrdersHistoryTotal() + "\n"+
@@ -267,7 +278,7 @@ void OnTick()
 //---
    if (IsNewCandle()){
       int ret = OrderEntry(IndicateTrade());
-//      ModifyOrders();
+      ModifyOrders();
    }
 
   }
