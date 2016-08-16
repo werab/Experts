@@ -25,15 +25,18 @@ input int MaxBuyOrders = 1;
 input int MaxSellOrders = 1;
 input int MinCandlesBeforeTradeSignal = 25; // candles
 
-input int AmountToLockIn = 10;
-input int PadBuffer = 10;
+input int AmountToLockIn = 5;
+input int BreakEvenBuffer = 10;
+
+int input TakeProfitFactor = 3;
 
 input double LotSize = 0.1;
+input int MinFreeMargin = 15;
 
 double pt;
 double StopLevel;
 int CurrentCandlesSinceLastMaSwap = 0;
-int TakeProfit = StopLoss * 3;
+int TakeProfit = StopLoss * TakeProfitFactor;
 
 double Shift;
 
@@ -48,9 +51,10 @@ static int BUY = 1;
 
 ////////////////////////////////
 // Todo List:
-// Take Profit rein
-// SL auf Break Even setzen (BreakEvenBuffer)
-// Current Cash im Auge behalten
+// Take Profit rein -!!-
+// Take Profit / StopLoss Windows management ?
+// SL auf Break Even setzen (BreakEvenBuffer) -!!-
+// Current Cash im Auge behalten -!!-
 
 // Use Custom Indicator
 //   * Main --> Buy/Sell Signal
@@ -81,7 +85,18 @@ int OnInit()
    Print("pt: "+(string) pt);
    
    StopLevel = MarketInfo(Symbol(), MODE_STOPLEVEL);
-   Shift = (AmountToLockIn + PadBuffer)*pt;
+   Shift = (MathMax(StopLevel, AmountToLockIn + BreakEvenBuffer))*pt;
+   
+   Comment("LotSize is: " + (string) LotSize + "\n"+
+           "Orders Open: "+ (string) OrdersTotal() + " / Orders Max: " + (string)(MaxBuyOrders + MaxSellOrders) +"\n"+
+           "Orders Saved: "+ (string) OrdersSaved + "\n"+
+           "Orders History: "+ (string) OrdersHistoryTotal() + "\n"+
+           "Account free margin: "+ (string)AccountFreeMargin() + "\n"+
+           "AccountBalance: "+ (string)AccountBalance() + "\n"+
+           "AccountEquity: "+ (string)AccountEquity() + "\n"+
+           "AccountCredit: "+ (string)AccountCredit() + "\n"+
+           "AccountMargin: "+ (string)AccountMargin() + "\n"+
+           "CurrentCandlesSinceLastMaSwap: " + (string)CurrentCandlesSinceLastMaSwap );
    
 //---
    return(INIT_SUCCEEDED);
@@ -229,8 +244,7 @@ int OrderEntry(int trade){
       
       if (ticket>0) {
          double _sl = ND(Ask-(StopLoss*pt));
-//         double _tp = ND(Ask+(TakeProfit*pt));
-         double _tp = 0;
+         double _tp = ND(Ask+(TakeProfit*pt));
          Print("Try to modify BUY StopLoss to:" + (string)_sl + " modify TakeProfit to: "+ (string)_tp);
          bool success = OrderModify(ticket, OrderOpenPrice(), _sl, _tp, 0, clrYellow);
          if (!success){
@@ -250,8 +264,8 @@ int OrderEntry(int trade){
       
       if (ticket>0) {
          double _sl = ND(Bid+(StopLoss*pt));
-//         double _tp = ND(Bid-(TakeProfit*pt));
-         double _tp = 0;
+         double _tp = ND(Bid-(TakeProfit*pt));
+//         double _tp = 0;
          Print("Try to modify SELL StopLoss to:" + (string)_sl + " modify TakeProfit to: "+ (string)_tp);
          bool success = OrderModify(ticket, OrderOpenPrice(), _sl, _tp, 0, clrYellow);
          if (!success){
@@ -264,6 +278,7 @@ int OrderEntry(int trade){
    
    return -1;
 }
+
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
@@ -273,11 +288,18 @@ void OnTick()
            "Orders Open: "+ (string) OrdersTotal() + " / Orders Max: " + (string)(MaxBuyOrders + MaxSellOrders) +"\n"+
            "Orders Saved: "+ (string) OrdersSaved + "\n"+
            "Orders History: "+ (string) OrdersHistoryTotal() + "\n"+
+           "Account free margin: "+ (string)AccountFreeMargin() + "\n"+
+           "AccountBalance: "+ (string)AccountBalance() + "\n"+
+           "AccountEquity: "+ (string)AccountEquity() + "\n"+
+           "AccountCredit: "+ (string)AccountCredit() + "\n"+
+           "AccountMargin: "+ (string)AccountMargin() + "\n"+
            "CurrentCandlesSinceLastMaSwap: " + (string)CurrentCandlesSinceLastMaSwap );
   
 //---
    if (IsNewCandle()){
-      int ret = OrderEntry(IndicateTrade());
+      if (AccountFreeMargin() > MinFreeMargin){
+         int ret = OrderEntry(IndicateTrade());
+      }
       ModifyOrders();
    }
 
