@@ -51,16 +51,7 @@ static int BUY = 1;
 
 ////////////////////////////////
 // Todo List:
-// Take Profit rein -!!-
-// Take Profit / StopLoss Windows management ?
-// SL auf Break Even setzen (BreakEvenBuffer) -!!-
-// Current Cash im Auge behalten -!!-
-
-// Use Custom Indicator
-//   * Main --> Buy/Sell Signal
-//   * Signal --> SL PadAmount
-// write indicator tester
-//   * count positiv/negativ trades with set SL to BreakEven
+// BreakEven checken
 
 /*
 double CorrectLots(double thelot) {
