@@ -13,13 +13,14 @@
 input int iStopLoss = 100;
 input int iPadAmount = 40;
 input int iTrailStop = 40;
-input int iiTakeProfitFactor = 3;
+input double dTakeProfitFactor = 3;
 
 int iTS;
 double dShift;
-string sIndicatorName = "RandomTime";
+//string sIndicatorName = "RandomTime";
+string sIndicatorName = "EURUSDmicroIndicator_01";
 double LotSize = 0.1;
-int iTakeProfit = iStopLoss * iiTakeProfitFactor;
+double dTakeProfit = iStopLoss * dTakeProfitFactor;
 
 static int SELL = -1;
 static int BUY = 1;
@@ -37,11 +38,11 @@ int OnInit()
 //---
 
    if(!(Digits==3 || Digits==5)){
-      Alert("This Broker onle trades "+ Digits +" Digits!");
+      Alert("This Broker only trades "+ (string)Digits +" Digits!");
       return(INIT_FAILED);
    }
 
-   iTS = MathMax(MarketInfo(Symbol(), MODE_STOPLEVEL), iTrailStop);
+   iTS = (int)MathMax(MarketInfo(Symbol(), MODE_STOPLEVEL), iTrailStop);
 
    dShift = (iTS + iPadAmount)*Point;
 
@@ -70,6 +71,15 @@ double ND(double val)
    return(NormalizeDouble(val, Digits));
 }
 
+int OpenOrderThisPair(string pair){
+   int total = 0;
+   for (int i=OrdersTotal()-1; i>=0; i--){
+      bool ret = OrderSelect(i, SELECT_BY_POS, MODE_TRADES);
+      if(ret && OrderSymbol() == pair) total++;
+   }
+   return (total);
+}
+
 void ModifyOrders(){
    for (int o=OrdersTotal()-1; o >=0; o--) {
       if (OrderSelect(o, SELECT_BY_POS, MODE_TRADES))
@@ -78,11 +88,11 @@ void ModifyOrders(){
       if (OrderType() == OP_BUY){
          if (OrderOpenPrice() < Bid - dShift){
             bool success = false;
-            if (OrderiStopLoss() < Bid - dShift)
+            if (OrderStopLoss() < Bid - dShift)
             {
-               double _sl = ND(Bid - (iTS*Points));
+               double _sl = ND(Bid - (iTS*Point));
                Print("Try to change SL to: "+ (string)_sl + " Bid: "+ (string)Bid);
-               success = OrderModify(OrderTicket(), OrderOpenPrice(), _sl, OrderiTakeProfit(), 0, clrMintCream);
+               success = OrderModify(OrderTicket(), OrderOpenPrice(), _sl, OrderTakeProfit(), 0, clrMintCream);
                if (!success){
                   int lErr = GetLastError();
                   Print("OrderModify LastError: "+(string)lErr);
@@ -93,11 +103,11 @@ void ModifyOrders(){
       } else if (OrderType() == OP_SELL){
          if (OrderOpenPrice() > Ask + dShift){
             bool success = false;
-            if (OrderiStopLoss() > Ask + dShift)
+            if (OrderStopLoss() > Ask + dShift)
             {
                double _sl = ND(Ask + (iTS*Point));
                Print("Try to change SL to: "+ (string)_sl + " Ask: "+(string)Ask);
-               success = OrderModify(OrderTicket(), OrderOpenPrice(), _sl, OrderiTakeProfit(), 0, clrMintCream);
+               success = OrderModify(OrderTicket(), OrderOpenPrice(), _sl, OrderTakeProfit(), 0, clrMintCream);
                if (!success){
                   int lErr = GetLastError();
                   Print("OrderModify LastError: "+(string)lErr);
@@ -111,7 +121,7 @@ void ModifyOrders(){
 
 int IndicateTrade()
 {
-   return (int) iCustom(NULL, 0, sIndicatorName, PRICE_CLOSE,0);
+   return (int)iCustom(NULL, PERIOD_M5, sIndicatorName, 75, PRICE_CLOSE,0);
 }
 
 
@@ -124,8 +134,8 @@ int OrderEntry(int trade){
 
       if (ticket>0) {
          double _sl = ND(Ask-(iStopLoss*Point));
-         double _tp = ND(Ask+(iTakeProfit*Point));
-         Print("Try to modify BUY iStopLoss to:" + (string)_sl + " modify iTakeProfit to: "+ (string)_tp);
+         double _tp = ND(Ask+(dTakeProfit*Point));
+         Print("Try to modify BUY iStopLoss to:" + (string)_sl + " modify dTakeProfit to: "+ (string)_tp);
          bool success = OrderModify(ticket, OrderOpenPrice(), _sl, _tp, 0, clrYellow);
          if (!success){
             lErr = GetLastError();
@@ -143,9 +153,9 @@ int OrderEntry(int trade){
 
       if (ticket>0) {
          double _sl = ND(Bid+(iStopLoss*Point));
-         double _tp = ND(Bid-(iTakeProfit*Point));
+         double _tp = ND(Bid-(dTakeProfit*Point));
 //         double _tp = 0;
-         Print("Try to modify SELL iStopLoss to:" + (string)_sl + " modify iTakeProfit to: "+ (string)_tp);
+         Print("Try to modify SELL iStopLoss to:" + (string)_sl + " modify dTakeProfit to: "+ (string)_tp);
          bool success = OrderModify(ticket, OrderOpenPrice(), _sl, _tp, 0, clrYellow);
          if (!success){
             lErr = GetLastError();
