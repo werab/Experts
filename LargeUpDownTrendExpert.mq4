@@ -21,9 +21,10 @@ int iDropGrothLookback = 5;
 int iTS;
 double dShift;
 //string sIndicatorName = "RandomTime";
-//string sIndicatorName = "EURUSDmicroIndicator_01";
-string sIndicatorName = "RandomTimeWithTrend";
+string sIndicatorName = "EURUSDmicroIndicator_01";
+//string sIndicatorName = "RandomTimeWithTrend";
 double LotSize = 0.1;
+bool bOrderPerDay = false;
 
 static int MAX_SL_SAFETY = 5000;
 
@@ -158,7 +159,7 @@ void ModifyOrders(){
 
 int IndicateTrade()
 {
-   return (int)iCustom(NULL, PERIOD_M5, sIndicatorName, 75, PRICE_CLOSE,0);
+   return (int)iCustom(NULL, PERIOD_D1, sIndicatorName, PRICE_CLOSE,0);
 }
 
 
@@ -209,12 +210,17 @@ void OnTick()
   {
 
 //---
-   if (IsNewCandle()){
-      if (noLargeDropOrGroth()){
-        int ret = OrderEntry(IndicateTrade());
-      }
-      ModifyOrders();
+   if (IsNewCandle()) bOrderPerDay = true;
+
+//      if (noLargeDropOrGroth()){
+   int trade = IndicateTrade();
+   if (trade != 0 && bOrderPerDay){
+      int ret = OrderEntry(trade);
+      bOrderPerDay = false;
    }
+//      }
+      ModifyOrders();
+//   }
 
   }
 //+------------------------------------------------------------------+
